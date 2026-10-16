@@ -1,0 +1,23 @@
+version: '3.8'
+# YouTube AI 學習助手 v3.3：NAS 54420 → 容器 8000；對外由 gateway 的 /ytai/ 轉進來
+services:
+  backend:
+    build:
+      context: .
+      args:
+        CACHEBUST: "1"
+    image: ytai-backend:3.3
+    container_name: ytai-backend
+    restart: unless-stopped
+    ports:
+      - "54420:8000"
+    env_file:
+      - .env
+    environment:
+      - COOKIE_PATH=/ytai/
+      - COOKIE_SECURE=1
+      - DATA_DIR=/app/data
+    volumes:
+      - ./data:/app/data      # 帳號、額度、問答紀錄（app.db）
+      - ./logs:/app/logs      # 每次提問的詳細紀錄
+      - ./state:/app/state    # 模型冷卻狀態

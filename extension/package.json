@@ -1,0 +1,19 @@
+{
+  "name": "youtube-ai-helper-extension",
+  "private": true,
+  "version": "0.3.2",
+  "type": "module",
+  "scripts": {
+    "prebuild": "node -e \"const fs=require('fs');if(fs.existsSync('dist'))for(const f of fs.readdirSync('dist'))fs.rmSync('dist/'+f,{recursive:true,force:true})\"",
+    "build": "vite build",
+    "watch": "vite build --watch"
+  },
+  "dependencies": {
+    "vue": "3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "5.2.4",
+    "typescript": "5.8.3",
+    "vite": "6.3.5"
+  }
+}

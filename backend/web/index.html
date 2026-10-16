@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>YouTube AI 學習助手</title>
+<!-- v3.1.1 改版：功能與 v3.1 相同。網址一律用相對路徑（api/...、app.js），因為在 NAS 上掛在 gateway 的 /ytai/ 底下。 -->
+<script>
+  // 日／月版面：先套用記住的選擇，避免畫面閃一下
+  try { const th = localStorage.getItem('ytai_theme'); if (th) document.documentElement.dataset.theme = th } catch {}
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Noto+Sans+TC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="style.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.youtube.com/iframe_api" async defer></script>
+</head>
+<body>
+<header class="bar">
+  <a class="brand" href="./"><span class="brand-mark" aria-hidden="true"></span><span data-i18n="title">YouTube AI 學習助手</span></a>
+  <div class="bar-right">
+    <span id="health" class="health"></span>
+    <button id="theme" type="button" class="theme" aria-label="切換日間／夜間">
+      <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3l1.7 1.7M17 17l1.7 1.7M5.3 18.7 7 17M17 7l1.7-1.7"/></svg>
+      <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.2 8.2 0 0 1 9.5 4a8.2 8.2 0 1 0 10.5 10.5Z"/></svg>
+    </button>
+    <div class="lang" role="group" aria-label="Language">
+      <button data-lang="zh-TW">繁中</button><button data-lang="en">EN</button>
+    </div>
+    <div id="me" class="me hidden">
+      <img id="me-pic" alt="" referrerpolicy="no-referrer">
+      <span id="me-initial" class="me-initial hidden" aria-hidden="true"></span>
+      <span id="me-name"></span>
+      <button id="logout" class="quiet" data-i18n="logout">登出</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 登入（首頁） -->
+  <section id="login-box" class="hero">
+    <div class="hero-copy">
+      <h1 data-i18n="login.head">看到哪裡卡住，就停在哪裡問。</h1>
+      <p class="lead" data-i18n="login.what">貼上 YouTube 教學影片，暫停後直接提問。AI 會看你停下來之前的十幾秒，告訴你那一步怎麼做。</p>
+      <div id="gbtn" class="gbtn"></div>
+      <p id="login-msg" class="msg bad"></p>
+      <p class="fine" data-i18n="login.note">目前是試用期，只有受邀的 Google 帳號能登入。</p>
+    </div>
+    <figure class="hero-demo" aria-hidden="true">
+      <div class="demo-screen"><span class="demo-play"></span></div>
+      <div class="demo-track"><span class="demo-fill"></span><span class="demo-pin"><b>4:42</b></span></div>
+      <div class="demo-q" data-i18n="demo.q">繩子要從上面還是下面穿？</div>
+      <div class="demo-a" data-i18n="demo.a">從下面穿過主線，再從左邊的洞拉出來（影片 0:59）。</div>
+    </figure>
+  </section>
+
+  <!-- 主畫面 -->
+  <div id="app" class="hidden">
+    <form id="url-form" class="urlbar">
+      <input id="url" type="url" inputmode="url" autocomplete="off" aria-label="YouTube URL"
+             data-i18n-ph="url.ph" placeholder="貼上 YouTube 影片網址">
+      <button class="primary" data-i18n="url.open">開啟影片</button>
+    </form>
+    <p id="url-msg" class="msg bad"></p>
+
+    <div class="stage">
+      <div class="watch">
+        <div class="player-wrap" id="player-wrap">
+          <div id="player"></div>
+          <div id="player-empty" class="player-empty" data-i18n="player.empty">貼上網址，影片會在這裡播放</div>
+        </div>
+        <div id="marks" class="marks hidden" aria-label="questions on this video">
+          <span id="marks-now" class="marks-now"></span>
+        </div>
+        <p id="vid-title" class="vid-title"></p>
+      </div>
+
+      <aside class="sheet">
+        <div class="moment">
+          <span id="pause-big" class="moment-time">0:00</span>
+          <p id="pause-at" class="moment-note"></p>
+        </div>
+
+        <textarea id="question" rows="3" data-i18n-ph="ask.ph" placeholder="這一步怎麼做？"></textarea>
+        <div class="ask-row">
+          <button id="mic" type="button" class="quiet hidden"><span data-i18n="ask.mic">按一下說話</span></button>
+          <button id="send" class="primary" data-i18n="ask.send">提問</button>
+        </div>
+        <div class="ask-foot">
+          <label class="check"><input type="checkbox" id="web-search"> <span data-i18n="ask.web">允許引用網路資料</span></label>
+          <span id="quota" class="quota"></span>
+        </div>
+        <p id="ask-msg" class="msg"></p>
+
+        <!-- AI 看不了這部影片時：電腦改用分享畫面 -->
+        <div id="share-box" class="notice hidden">
+          <p id="share-reason" class="notice-head"></p>
+          <p data-i18n="share.how">按下面的按鈕，在跳出的視窗選「這個分頁」→「分享」。網頁會倒回 12 秒播放並截圖給 AI；畫面只送給 AI，不會錄影。</p>
+          <div class="notice-actions">
+            <button id="share-go" class="primary" data-i18n="share.go">分享這個分頁並重新提問</button>
+            <button id="share-skip" class="quiet" data-i18n="share.skip">不分享，只用標題回答</button>
+          </div>
+        </div>
+
+        <div id="answer-box" class="answer hidden" aria-live="polite">
+          <div class="answer-head">
+            <h2 data-i18n="answer.title">回答</h2>
+            <button id="speak" type="button" class="quiet small"><span data-i18n="answer.read">朗讀</span></button>
+          </div>
+          <p id="answer" class="answer-text"></p>
+          <p id="answer-meta" class="fine"></p>
+          <details id="frames-box" class="hidden"><summary data-i18n="answer.frames">AI 看到的畫面</summary><div id="frames" class="frames"></div></details>
+          <p class="fine" data-i18n="answer.disclaimer">AI 可能會出錯，重要步驟請以影片為準。</p>
+        </div>
+      </aside>
+
+    <section class="log">
+      <div class="log-head">
+        <h2 data-i18n="hist.title">問過的問題</h2>
+        <div class="log-actions">
+          <button id="h-export" class="quiet small" data-i18n="hist.export">匯出筆記</button>
+          <button id="h-clear" class="quiet small danger" data-i18n="hist.clear">刪除全部</button>
+        </div>
+      </div>
+      <p id="h-empty" class="fine hidden" data-i18n="hist.empty">還沒有問過問題。開一部影片，停在不懂的地方試試看。</p>
+      <ul class="hist" id="h-list"></ul>
+    </section>
+    </div>
+
+    <details id="admin-box" class="admin hidden">
+      <summary data-i18n="admin.title">管理使用者</summary>
+      <p class="fine" id="admin-note"></p>
+      <div class="tablewrap"><table id="admin-table"></table></div>
+
+      <h3 class="admin-sub" data-i18n="invite.title">邀請名單</h3>
+      <p class="fine" data-i18n="invite.note">只有名單上的 Gmail 能登入。移除後對方會立刻被登出；重複加入同一個 Gmail 不會產生重複。</p>
+      <form id="invite-form" class="invite-form">
+        <input id="invite-email" type="email" autocomplete="off" required data-i18n-ph="invite.email_ph" placeholder="朋友的 Gmail">
+        <input id="invite-note" type="text" autocomplete="off" maxlength="100" data-i18n-ph="invite.note_ph" placeholder="備註（例如：烘焙班同學）">
+        <button class="primary" data-i18n="invite.add">加入</button>
+      </form>
+      <p id="invite-msg" class="msg"></p>
+      <div class="tablewrap"><table id="invite-table"></table></div>
+    </details>
+
+    <p class="fine privacy" data-i18n="privacy">你的問題與影片片段會送到 Google、Groq、OpenRouter 的 AI 處理；Google 免費版的內容可能被用於改進其產品。請不要在問題裡寫個人資料。</p>
+  </div>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

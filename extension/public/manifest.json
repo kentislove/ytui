@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube AI 學習助手",
+  "version": "0.3.2",
+  "description": "看 YouTube 教學影片時按暫停就能提問，AI 依畫面、字幕與說明欄回答。與網頁版共用帳號與問答紀錄。",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "tabs",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://your-server.example.com/*",
+    "http://localhost:5173/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "YouTube AI 學習助手"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "main_world.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.youtube.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

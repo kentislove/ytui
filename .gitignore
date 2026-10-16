@@ -1,0 +1,17 @@
+# 金鑰與設定（絕對不要上傳）
+.env
+*.pem
+私鑰*/
+
+# 使用者資料與紀錄
+backend/data/
+backend/logs/
+backend/state/
+
+# 開發環境與編譯產物
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+extension/dist/
+*.zip
